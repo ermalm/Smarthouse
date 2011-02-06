@@ -1,0 +1,201 @@
+<h2>A network watchdog</h2>
+<pre>
+
+
+This is the software for the tuxgraphics.org
+Tuxgraphics.org ethernet host watchdog. See http://tuxgraphics.org/electronics/
+
+Copyright of most software and all diagrams: Guido Socher
+
+Copyright of enc28j60.c/enc28j60.h Pascal Stang (http://www.procyonengineering.com/)
+          and small modifications by Guido Socher
+
+License for everything: GPL V2
+See http://www.gnu.org/licenses/gpl.html
+---------------------------------------------------------------------------
+
+ All parts needed to build this AVR ethernet solution can be ordered from 
+ http://shop.tuxgraphics.org/                                          
+ Note that the magnetics need to fit exactly the requirements of the enc28j60
+ chip. You can not just take any transformer.
+
+eth_rem_dev_tcp_pre.hex
+-----------------------
+A pre-compiled program with the IP address: 10.0.0.27 and the
+MAC address 54:55:58:11:00:27 is available as eth_rem_dev_tcp_pre.hex
+You can change the IP address at runtime but not the MAC. The MAC must
+be uniqueue in your network.
+
+The relay that controls the reset or the power of the monitored host
+must be connected via pin PD7.
+
+Compiling the software yourself
+-------------------------------
+!! READ THIS FIRST !!
+---------------------
+! Edit the file main.c and change the line:
+! static uint8_t mymac[6] = {0x54,0x55,0x58,0x11,0x00,0x27};
+! In the test programs you should also change this:
+! static uint8_t myip[4] = {10,0,0,27};
+
+
+Check the file "Makefile" and make sure the MCU is set correctly:
+MCU=atmega168
+or
+MCU=atmega88
+
+For the first device you build you will not need to change the mymac line.
+But you will probably need to change the IP address (myip). It must be a
+free address from the address range in your home network.
+
+There is a range of private addresses (not routed on the public internet)
+which you can use:
+Netmask          Network Addresses
+255.0.0.0         10.0.0.0 - 10.255.255.255
+255.255.0.0       172.16.0.0 - 172.31.255.255
+255.255.255.0     192.168.0.0 - 192.168.255.255
+
+Example: you wlan router might have 192.168.1.1, your PC might have
+192.168.1.2. This means you could e.g use 192.168.1.10 and leave some
+room for more PCs. If you use DHCP then make sure that the address it not
+double allocated (exclude it from the DHCP range).
+
+You need an avr-gcc development environment in order to compile this.
+You need at least avrlibc-1.4.x !! The atmega88 will not work with earilier 
+version.
+
+To compile the final software use the command:
+make
+
+Note: windows users may use and modify the supplied win_cmp.bat to setup the
+environment correctly.
+
+
+
+The above command will compile the following hex files:
+eth_rem_dev_tcp.hex  test0.hex  test1.hex  test2.hex  test_readSiliconRev.hex
+
+The command
+make load
+
+will execute the avrdude command to load the software.
+E.g something like:
+   avrdude -p m168 -c stk500v2 -e -U flash:w:eth_rem_dev_tcp.hex
+
+! Note your programmer might interfer with the enc28j60! For the avrusb500
+! with 30cm cable you can normally leave the cable on. For all other programmers
+! it is however saver to remove the programmer cable and power down/up the device.
+! This is because the SPI interface is used for loading of the software and 
+! communication to the enc28j60.
+
+To see a list of all possible build targets run the command:
+make help
+
+Selecting the right clock source
+--------------------------------
+Tuxgraphics hardware sold as of march 2007 is prepared to use the clock
+signal from the enc28j60. To use this you need to change the 
+low fuse byte once from 0x62 to 0x60:
+
+avrdude -p m88 -c stk500v2 -u -v -U lfuse:w:0x60:m
+or 
+avrdude -p m168 -c stk500v2 -u -v -U lfuse:w:0x60:m
+or 
+avrdude -p m328 -c stk500v2 -u -v -U lfuse:w:0x60:m
+
+or just type in your Linux shell:
+make fuse
+
+After programming the fuse settings of atmega168 and atmega88 should be:
+ low fuse:  0x60
+ high fuse: 0xdf
+ ext. fuse: 0x01
+
+For the atmega328 the hfuse and efuse bytes look slightly different.
+The idea is however the same. Just change the lfuse from factory default
+to 0x60. The fuse settings of the atmega328 are after programming:
+ lfuse reads as 0x60
+ hfuse reads as 0xD9
+ efuse reads as 0x07
+
+details of the lfuse bits:
+  CKDIV8 = 0
+  CKOUT  = 1
+  SUT1   = 1
+  SUT0   = 0
+  CKSEL3 = 0
+  CKSEL2 = 0
+  CKSEL1 = 0
+  CKSEL0 = 0
+
+Note: Older hardware must use the atmega88 internal clock (8MHz).
+Don't try to change any fuse bytes on the older hardware!! You will
+not easily be able to undo such an operation on the older hardware.
+It will completely halt and nothing will work anymore.
+The older hardware must use the factory default fuses which look like this:
+low fuse:  0x62
+high fuse: 0xdf
+ext. fuse: 0x01
+
+If you are unsure what the current fuse setting are on the 
+atmega88 (or atmega168/ atmega328) then you can read the 
+fuse settings with a command like: 
+          avrdude -p m88 -c stk500v2 -v -q
+
+      The result should be this (default factory settings):
+          avrdude: safemode: lfuse reads as 62
+          avrdude: safemode: hfuse reads as DF
+          avrdude: safemode: efuse reads as 1
+
+
+Compiling on non-Unix systems
+-----------------------------
+Please use the provided Makefile
+It will also work under Windows except for the loading
+of the software. That is compiling will work but not
+"make load". Use then whatever tools and commands to download
+the resuting .hex file into the micrcontroller
+
+Take also a look at the supplied win_cmp.bat file. This bat script
+might be needed to set the environment correctly.
+
+
+Using the webserver based network watchdog:
+-------------------------------------------
+Point your web browser to
+http://10.0.0.27   (or what ever IP address you have given your hardware)
+
+You should get as answer a web page with (default password is "secret"):
+
+Menu: actions | config | help | refresh page
+
+Host watchdog
+
+Status: OK [reset cnt:0, active]
+-------------------------------------------------------------------------------
+
+ monitored IP: [10.0.0.7    ]
+ping interval: [30 ]s [*]Send ping
+           pw: [        ]
+[change]
+-------------------------------------------------------------------------------
+Version 2.16
+
+
+
+The above web-page does an automatic refresh every 60sec.
+
+How to use this watchdog is described in details at:
+http://tuxgraphics.org/hwd.html
+
+Revision history
+----------------
+
+2008-12-10: version 2.13 -- First version of the reset pushbutton code. Based
+                            on eth_rem_dev_tcp-2.11
+2008-12-30: version 2.14 -- Avoid interfrence between ping and web traffic
+2008-12-31: version 2.15 -- adaptations for atmega328 chip
+2009-02-28: version 2.16 -- Enc bug fixes and cosmetic code updates.
+2009-03-11: version 2.17 -- updates to the README file
+# vim:sw=8:ts=8:si:et
+</pre>
